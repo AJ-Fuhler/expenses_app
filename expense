@@ -3,41 +3,42 @@
 from datetime import date
 from textwrap import dedent
 import sys
+from contextlib import contextmanager
 
 import psycopg2
 from psycopg2 import extras
 
 class ExpenseData:
-    def add_expense(self, amount, memo):
+
+    @contextmanager
+    def _database_connect(self):
         connection = psycopg2.connect(dbname='expenses')
         try:
             with connection:
-                with connection.cursor() as cursor:
-                    cursor.execute(
-                        """
-                            INSERT INTO expenses
-                            (amount, memo, created_on)
-                            VALUES
-                            (%s, %s, %s)
-                        """,
-                        (amount, memo, date.today())
-                    )
-                    
-
+                yield connection
         finally:
             connection.close()
+
+    def add_expense(self, amount, memo):
+        with self._database_connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                        INSERT INTO expenses
+                        (amount, memo, created_on)
+                        VALUES
+                        (%s, %s, %s)
+                    """,
+                    (amount, memo, date.today())
+                )
+        
     
     def list_expenses(self):
-        connection = psycopg2.connect(dbname='expenses')
-        try:
-            with connection:
-                with connection.cursor(cursor_factory=extras.DictCursor) as cursor:
-                    cursor.execute("SELECT * FROM expenses ORDER BY created_on ASC")
-                    result = cursor.fetchall()
-        finally:
-            connection.close()
-
-
+        with self._database_connect() as connection:
+            with connection.cursor(cursor_factory=extras.DictCursor) as cursor:
+                cursor.execute("SELECT * FROM expenses ORDER BY created_on ASC")
+                result = cursor.fetchall()
+        
         for expense in result:
             columns = [
                 str(expense["id"]).rjust(3),
