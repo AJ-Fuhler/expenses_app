@@ -28,6 +28,20 @@ class ExpenseData:
                 str(expense["memo"])
             ]
             print(" | ".join(columns))
+    
+    def _display_count(self, count):
+        if count == 0:
+            print("There are no expenses.")
+        elif count == 1:
+            print("There is one expense.")
+        else:
+            print(f"There are {count} expenses.")
+
+    def _display_total(self, expenses):
+        amount_sum = sum([expense['amount'] for expense in expenses])
+        print("-" * 50)
+        print(f"Total {str(round(amount_sum, 2)).rjust(25)}")
+         
 
     def add_expense(self, amount, memo):
         with self._database_connect() as connection:
@@ -49,7 +63,10 @@ class ExpenseData:
                 cursor.execute("SELECT * FROM expenses ORDER BY created_on ASC")
                 result = cursor.fetchall()
         
+        self._display_count(len(result))
         self._display_expenses(result)
+        if len(result) > 1:
+            self._display_total(result)
     
     def search_expenses(self, query):
         with self._database_connect() as connection:
@@ -58,7 +75,31 @@ class ExpenseData:
                 cursor.execute(sql, (f"%{query}%",))
                 result = cursor.fetchall()
         
+        self._display_count(result)
         self._display_expenses(result)
+        if len(result) > 1:
+            self._display_total(result)
+    
+    def delete_expense(self, id):
+        with self._database_connect() as connection:
+            with connection.cursor(cursor_factory=extras.DictCursor) as cursor:
+                sql = "SELECT * FROM expenses WHERE id = %s"
+                cursor.execute(sql, (id,))
+                result = cursor.fetchone()
+                if result:
+                    sql = "DELETE FROM expenses WHERE id = %s"
+                    cursor.execute(sql, (id,))
+                    print(f"The following expense has been deleted:")
+                    self._display_expenses([result])
+                    return
+                print(f"There is no expense with id '{id}'.")
+    
+    def delete_all_expenses(self):
+        with self._database_connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute("DELETE FROM expenses")
+                print("All expenses have been deleted.")
+
 
 class CLI:
     def __init__(self):
@@ -80,9 +121,22 @@ class CLI:
             case "list":
                 self.application.list_expenses()
             case "search":
-                if len(arguments) == 1:
-                    query = arguments[0]
-                    self.application.search_expenses(query)
+                if len(arguments) < 1:
+                    print("You must provide a memo.")
+                    return
+                query = arguments[0]
+                self.application.search_expenses(query)
+            case "delete":
+                if len(arguments) < 1:
+                    print("You must provide an expense ID.")
+                id = arguments[0]
+                self.application.delete_expense(id)
+            
+            case "clear":
+                print("This will THis will remove all expenses. Are you sure? (enter y to confirm)")
+                response = input().strip()
+                if response.lower() == 'y':
+                    self.application.delete_all_expenses()
             case _:
                 self.display_help()
 
