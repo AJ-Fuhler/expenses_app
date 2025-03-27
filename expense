@@ -18,6 +18,16 @@ class ExpenseData:
                 yield connection
         finally:
             connection.close()
+    
+    def _display_expenses(self, result):
+        for expense in result:
+            columns = [
+                str(expense["id"]).rjust(3),
+                str(expense["created_on"]),
+                str(expense["amount"]).rjust(12),
+                str(expense["memo"])
+            ]
+            print(" | ".join(columns))
 
     def add_expense(self, amount, memo):
         with self._database_connect() as connection:
@@ -39,14 +49,16 @@ class ExpenseData:
                 cursor.execute("SELECT * FROM expenses ORDER BY created_on ASC")
                 result = cursor.fetchall()
         
-        for expense in result:
-            columns = [
-                str(expense["id"]).rjust(3),
-                str(expense["created_on"]),
-                str(expense["amount"]).rjust(12),
-                str(expense["memo"])
-            ]
-            print(" | ".join(columns))
+        self._display_expenses(result)
+    
+    def search_expenses(self, query):
+        with self._database_connect() as connection:
+            with connection.cursor(cursor_factory=extras.DictCursor) as cursor:
+                sql = "SELECT * FROM expenses WHERE memo ILIKE %s"
+                cursor.execute(sql, (f"%{query}%",))
+                result = cursor.fetchall()
+        
+        self._display_expenses(result)
 
 class CLI:
     def __init__(self):
@@ -67,6 +79,10 @@ class CLI:
                 self.application.add_expense(amount, memo)
             case "list":
                 self.application.list_expenses()
+            case "search":
+                if len(arguments) == 1:
+                    query = arguments[0]
+                    self.application.search_expenses(query)
             case _:
                 self.display_help()
 
