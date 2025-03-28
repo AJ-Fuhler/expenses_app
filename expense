@@ -9,6 +9,8 @@ import psycopg2
 from psycopg2 import extras
 
 class ExpenseData:
+    def __init__(self):
+        self._setup_schema()
 
     @contextmanager
     def _database_connect(self):
@@ -41,6 +43,23 @@ class ExpenseData:
         amount_sum = sum([expense['amount'] for expense in expenses])
         print("-" * 50)
         print(f"Total {str(round(amount_sum, 2)).rjust(25)}")
+    
+    def _setup_schema(self):
+        with self._database_connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'expenses'")
+                result = cursor.fetchone()
+                if result[0] == 0:
+                    cursor.execute(
+                        """
+                            CREATE TABLE expenses (
+                            id serial PRIMARY KEY,
+                            amount numeric(6,2) NOT NULL,
+                            memo text NOT NULL,
+                            created_on date NOT NULL
+                            );
+                            ALTER TABLE expenses ADD CONSTRAINT positive_amount CHECK (amount >= 0.01)
+                        """)
          
 
     def add_expense(self, amount, memo):
